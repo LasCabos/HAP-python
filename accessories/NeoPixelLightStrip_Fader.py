@@ -155,13 +155,13 @@ class NeoPixelLightStrip_Fader(Accessory):
 
         # Configure our callbacks
         self.char_hue = serv_light.configure_char(
-            'Hue', setter_callback=self.set_hue)
+            'Hue', setter_callback=self.hue_changed)
         self.char_saturation = serv_light.configure_char(
-            'Saturation', setter_callback=self.set_saturation)
+            'Saturation', setter_callback=self.saturation_changed)
         self.char_on = serv_light.configure_char(
-            'On', setter_callback=self.set_state)
+            'On', setter_callback=self.state_changed)
         self.char_on = serv_light.configure_char(
-            'Brightness', setter_callback=self.set_brightness)
+            'Brightness', setter_callback=self.brightness_changed)
 
         # Set our startup color - Red
         self.color = Neo_Color.from_rgb(255, 0, 0)
@@ -179,10 +179,10 @@ class NeoPixelLightStrip_Fader(Accessory):
         # self.hue_color_fade_array = [self.color]
         # self.MAX_COLORFADE_COLORS = 3
 
-    def set_state(self, value):
+    def state_changed(self, value):
         self.accessory_state = value
         if value == 1:  # On
-            self.set_hue(self.color.get_hsv()[0])
+            self.hue_changed(self.color.get_hsv()[0])
         else:
             self.update_neopixel_with_color(Neo_Color.black())  # Off
            # self.hue_color_fade_array.clear()  # Lets clear the array to stop the color fade
@@ -202,7 +202,7 @@ class NeoPixelLightStrip_Fader(Accessory):
 #                 self.update_neopixel_with_color(new_color_tuple[0], new_color_tuple[1], new_color_tuple[2])
 #                 self.hue = new_hue
 
-    def set_hue(self, value):
+    def hue_changed(self, value):
         # ---------- New Color Fade Stuff ---------
         # print("------ Hue Changed -----")
         # # Check if color fade color
@@ -236,13 +236,13 @@ class NeoPixelLightStrip_Fader(Accessory):
         if self.accessory_state == 1:
             self.update_neopixel_with_color(self.color)
 
-    def set_brightness(self, value):
+    def brightness_changed(self, value):
         self.color.set_brightness(value)
-        self.set_hue(self.color.get_hsv()[0])
+        self.hue_changed(self.color.get_hsv()[0])
 
-    def set_saturation(self, value):
+    def saturation_changed(self, value):
         self.color.set_saturation(value)
-        self.set_hue(self.color.get_hsv()[0])
+        self.hue_changed(self.color.get_hsv()[0])
 
     def update_neopixel_with_color(self, color):
         rgb_tuple = color.get_rgb()
