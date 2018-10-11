@@ -23,8 +23,8 @@ An Accessory for Adafruit NeoPixels attached to GPIO Pin18
 
  Apple Homekit API Values 
  Hue: 0 -360
- Saturuation: 0 - 1.0
- Brightness: 0 - 1.0
+ Saturuation: 0 - 100
+ Brightness: 0 - 100
  State: 0 - 1
 """
 
@@ -38,7 +38,10 @@ from pyhap.const import CATEGORY_LIGHTBULB
 
 class Neo_Color:
     """Class is used for easy passing and converting of colors between
-    Apple HomeKit API and NeoPixel Library"""
+    Apple HomeKit API and NeoPixel Library
+    Conversion from HSV to RGB use python colorsys library whos values 
+    range from 0 - 1 which require conversions to 8bit rgb and HomeKit API 
+    standards"""
 
     def __init__(self):
         """Do not invoke directly - Use class methods
@@ -47,8 +50,8 @@ class Neo_Color:
         self._green = 0
         self._blue = 0
         self._hue = 0
-        self._saturation = 1.0
-        self._brightness = 1.0
+        self._saturation = 100
+        self._brightness = 100
 
     @classmethod
     def from_rgb(cls, red, green, blue):
@@ -62,10 +65,19 @@ class Neo_Color:
         color.set_color_with_hsv(hue, saturation, brightness)
         return color
 
+    # Pre defined Colors
     @classmethod
     def black(cls):
         color = cls()
         color.set_color_with_rgb(0, 0, 0)
+        return color
+
+    @classmethod
+    def white(cls):
+        color = cls()
+        color.set_color_with_rgb(255, 255, 255)
+        return color
+    # End predefined colors
 
     def _update_member_rgb_values(self, rgb_tuple):
         self._red = rgb_tuple[0] * 255
@@ -80,12 +92,15 @@ class Neo_Color:
         self._green = green
         self._blue = blue
         hsv = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
-        self._hue = 360 / hsv[0]
-        self._saturation = hsv[1]
-        self._brightness = hsv[2]
+        self._hue = hsv[0] * 360
+        self._saturation = hsv[1] * 100
+        self._brightness = hsv[2] * 100
 
     def get_hsv(self):
-        return self._hue, self._saturation, self._brightness
+        hue = self._hue
+        sat = self._saturation
+        br = self._brightness
+        return hue, sat, br
 
     def set_color_with_hsv(self, hue, saturation, brightness):
         self._hue = hue
@@ -98,18 +113,18 @@ class Neo_Color:
 
     def set_hue(self, hue):
         self._hue = hue
-        rgb = colorsys.hsv_to_rgb(self._hue, self._saturation, self._brightness)
-        _update_member_rgb_values(rgb)
+        rgb = colorsys.hsv_to_rgb(self._hue / 360, self._saturation / 100, self._brightness / 100)
+        self._update_member_rgb_values(rgb)
 
     def set_saturation(self, saturation):
         self._saturation = saturation
-        rgb = colorsys.hsv_to_rgb(self._hue, self._saturation, self._brightness)
-        _update_member_rgb_values(rgb)
+        rgb = colorsys.hsv_to_rgb(self._hue / 360, self._saturation / 100, self._brightness / 100)
+        self._update_member_rgb_values(rgb)
 
     def set_brightness(self, brightness):
         self._brightness = brightness
-        rgb = colorsys.hsv_to_rgb(self._hue, self._saturation, self._brightness)
-        _update_member_rgb_values(rgb)
+        rgb = colorsys.hsv_to_rgb(self._hue / 360, self._saturation / 100, self._brightness / 100)
+        self._update_member_rgb_values(rgb)
 
 
 class NeoPixelLightStrip_Fader(Accessory):
@@ -150,6 +165,7 @@ class NeoPixelLightStrip_Fader(Accessory):
 
         # Set our startup color - Red
         self.color = Neo_Color.from_rgb(255, 0, 0)
+        print("INIT Color: {}".format(self.color.get_rgb()))
         self.accessory_state = 0
         self.is_GRB = is_GRB  # Most neopixels are Green Red Blue
         self.LED_count = LED_count
@@ -158,18 +174,18 @@ class NeoPixelLightStrip_Fader(Accessory):
                                            LED_DMA, LED_invert, LED_brightness)
         self.neo_strip.begin()
 
-        # Color Fade
-        self.old_time = time.time()
-        self.hue_color_fade_array = [color]
-        self.MAX_COLORFADE_COLORS = 3
+        # # Color Fade
+        # self.old_time = time.time()
+        # self.hue_color_fade_array = [self.color]
+        # self.MAX_COLORFADE_COLORS = 3
 
     def set_state(self, value):
         self.accessory_state = value
         if value == 1:  # On
-            self.set_hue(self.color.get_hsv[0])
+            self.set_hue(self.color.get_hsv()[0])
         else:
             self.update_neopixel_with_color(Neo_Color.black())  # Off
-            self.hue_color_fade_array.clear()  # Lets clear the array to stop the color fade
+           # self.hue_color_fade_array.clear()  # Lets clear the array to stop the color fade
 
 # # Lets check if we should update our color
 #     @Accessory.run_at_interval(1)
@@ -222,14 +238,14 @@ class NeoPixelLightStrip_Fader(Accessory):
 
     def set_brightness(self, value):
         self.color.set_brightness(value)
-        self.set_hue(self.color.get_hsv[0])
+        self.set_hue(self.color.get_hsv()[0])
 
     def set_saturation(self, value):
         self.color.set_saturation(value)
-        self.set_hue(self.color.get_hsv[0])
+        self.set_hue(self.color.get_hsv()[0])
 
     def update_neopixel_with_color(self, color):
-        rgb_tuple = self.color.get_rgb
+        rgb_tuple = color.get_rgb()
         for i in range(self.LED_count):
             if(self.is_GRB):
                 self.neo_strip.setPixelColor(i, Color(int(rgb_tuple[1]),
@@ -252,43 +268,3 @@ class NeoPixelLightStrip_Fader(Accessory):
                 else:
                     self.neo_strip.setPixelColor(i, Color(int(rgb_tuple[0], rgb_tuple[1], rgb_tuple[2])))
                 self.neo_strip.setPixelColor(i, Color(0, 0, 0))
-
-    def hsv_to_rgb(self, h, s, v):
-        """
-        This function takes
-         h - 0 - 360 Deg
-         s - 0 - 100 %
-         v - 0 - 100 %
-        """
-
-        hPri = h / 60
-        s = s / 100
-        v = v / 100
-
-        if s <= 0.0:
-            return int(0), int(0), int(0)
-
-        C = v * s  # Chroma
-        X = C * (1 - abs(hPri % 2 - 1))
-
-        RGB_Pri = [0.0, 0.0, 0.0]
-
-        if 0 <= hPri <= 1:
-            RGB_Pri = [C, X, 0]
-        elif 1 <= hPri <= 2:
-            RGB_Pri = [X, C, 0]
-        elif 2 <= hPri <= 3:
-            RGB_Pri = [0, C, X]
-        elif 3 <= hPri <= 4:
-            RGB_Pri = [0, X, C]
-        elif 4 <= hPri <= 5:
-            RGB_Pri = [X, 0, C]
-        elif 5 <= hPri <= 6:
-            RGB_Pri = [C, 0, X]
-        else:
-            RGB_Pri = [0, 0, 0]
-
-        m = v - C
-        print("Hue Sat Brt: {}, {}, {} : R G B: {}, {}, {}".format(h, s, v, (RGB_Pri[0] + m) * 255, (RGB_Pri[1] + m) * 255, (RGB_Pri[2] + m) * 255))
-
-        return int((RGB_Pri[0] + m) * 255), int((RGB_Pri[1] + m) * 255), int((RGB_Pri[2] + m) * 255)
