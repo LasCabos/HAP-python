@@ -29,6 +29,7 @@ An Accessory for Adafruit NeoPixels attached to GPIO Pin18
 """
 
 from neopixel import *
+from random import randrange
 import time
 import colorsys
 
@@ -79,6 +80,12 @@ class Neo_Color:
         return color
     # End predefined colors
 
+    @classmethod
+    def generate_random_color(cls):
+        color = cls()
+        color.set_color_with_rgb(randrange(256), randrange(256), randrange(256))
+        return color
+
     def _update_member_rgb_values(self, rgb_tuple):
         self._red = rgb_tuple[0] * 255
         self._green = rgb_tuple[1] * 255
@@ -102,11 +109,18 @@ class Neo_Color:
         br = self._brightness
         return hue, sat, br
 
+    def get_hex(self):
+        hexColour = int('%02x%02x%02x%02x' % (int(self._red) * 255,
+                                              int(self._green) * 255,
+                                              int(self._blue) * 255,
+                                              1), 16)
+        return hexColour
+
     def set_color_with_hsv(self, hue, saturation, brightness):
         self._hue = hue
         self._saturation = saturation
         self._brightness = brightness
-        rgb = colorsys.hsv_to_rgb(hue, saturation, brightness)
+        rgb = colorsys.hsv_to_rgb(hue / 360, saturation / 100, brightness / 100)
         self._red = rgb[0] * 255
         self._green = rgb[1] * 255
         self._blue = rgb[2] * 255
@@ -174,10 +188,10 @@ class NeoPixelLightStrip_Fader(Accessory):
                                            LED_DMA, LED_invert, LED_brightness)
         self.neo_strip.begin()
 
-        # # Color Fade
-        # self.old_time = time.time()
-        # self.hue_color_fade_array = [self.color]
-        # self.MAX_COLORFADE_COLORS = 3
+        # Color Fade
+        self.old_time = time.time()
+        self.color_fade_array = [self.color]
+        self.MAX_COLORFADE_COLORS = 2
 
     def state_changed(self, value):
         self.accessory_state = value
@@ -185,54 +199,64 @@ class NeoPixelLightStrip_Fader(Accessory):
             self.hue_changed(self.color.get_hsv()[0])
         else:
             self.update_neopixel_with_color(Neo_Color.black())  # Off
-           # self.hue_color_fade_array.clear()  # Lets clear the array to stop the color fade
+            if(len(self.color_fade_array) > 1):
+                self.color_fade_array.clear()  # Lets clear the array to stop the color fade
 
-# # Lets check if we should update our color
-#     @Accessory.run_at_interval(1)
-#     def run(self):
-#         # NOTE: - The problem with hue is its resolution.1 hue = ~4 RGB value.
-#         # therefore we must incriment by 1/4 iterations for smooth transistion
-#         # This is just a full rainbow color fade
-#         if(len(self.hue_color_fade_array) > 1):
-#             new_hue = self.hue + 0.25
-#             if(new_hue > 360):
-#                 new_hue = 0
-#             new_color_tuple = self.hsv_to_rgb(new_hue, self.saturation, self.brightness)
-#             if(len(new_color_tuple) == 3):
-#                 self.update_neopixel_with_color(new_color_tuple[0], new_color_tuple[1], new_color_tuple[2])
-#                 self.hue = new_hue
+# Lets check if we should update our color
+    @Accessory.run_at_interval(1)
+    def run(self):
+        if(len(self.color_fade_array) > 1):
+            start_color = self.color_fade_array[0]
+            end_color = self.color_fade_array[1]
+            current_color = self.color
+            # Calc color trantions
+            INTERVAL = 1  # seconds - Should be the same as the parameter in this function
+            TRANSITION_LENGTH = 60  # seconds
+            delta_hue = end_color.get_hsv()[0] - start_color.get_hsv()[0]
+            delta_saturation = end_color.get_hsv()[1] - start_color.get_hsv()[1]
+            hue_change_per_interval = delta_hue / TRANSITION_LENGTH * INTERVAL
+            saturation_change_per_interval = delta_saturation / TRANSITION_LENGTH * INTERVAL
+
+            #TODO: - Update with hex color for check
+            if(current_color.get_hex() == end_color.get_hex()):
+                # We have reached the end of the color fade lets switch them and go back
+                self.color_fade_array[0], self.color_fade_array[1] = self.color_fade_array[1], self.color_fade_array[0]
+                print("Reached the end of the color fade array - switching back")
+            else:
+                new_hue = current_color.get_hsv()[0] + hue_change_per_interval
+                new_saturation = current_color.get_hsv()[1] + saturation_change_per_interval
+                new_brightness = current_color.get_hsv()[2]
+                new_color = Neo_Color.from_hsv(new_hue, new_saturation, new_brightness)
+                print("New Color: {}".format(new_color.get_rgb()))
+                self.update_neopixel_with_color(new_color)
+                self.color = new_color
 
     def hue_changed(self, value):
         # ---------- New Color Fade Stuff ---------
-        # print("------ Hue Changed -----")
-        # # Check if color fade color
-        # if(value != self.hue):  # if we have a new hue value
-        #     newTime = time.time()
-        #     deltaTime = newTime - self.old_time
-        #     # Append our new color if we click bettween times
-        #     if(0.25 < deltaTime and deltaTime < 1.0):
-        #         if(len(self.hue_color_fade_array) < self.MAX_COLORFADE_COLORS):
-        #             self.hue_color_fade_array.insert(0, value)
-        #             print("Inserting new hue in array")
-        #             # TODO: - Add flashing so user knows they are in color change mode
-        #         else:
-        #             self.hue_color_fade_array.pop()
-        #             self.hue_color_fade_array.insert(0, value)
-        #             print("Poping last value and inserting")
-        #     else:  # Lets reset our list
-        #         self.hue_color_fade_array.clear()
-        #         self.hue_color_fade_array.append(value)
-        #         print("Resetting array and appending")
+        new_color = Neo_Color.from_hsv(value, self.color.get_hsv()[1], self.color.get_hsv()[2])
+        print("Color HEX: {} RGB: {}".format(self.color.get_hex(), self.color.get_rgb()))
+        print("New Color HEX: {} RGB: {}".format(new_color.get_hex(),new_color.get_rgb()))
 
-        #     print("DeltaTime: ", deltaTime)
-        #     print("Color Array: ", self.hue_color_fade_array)
-        #     print("----- End Hue ------")
-
-        #     self.old_time = newTime
-        # ----------- End New Color Fade Stuff --------
+        if(new_color.get_hex() != self.color.get_hex()):
+            new_time = time.time()
+            delta_time = new_time - self.old_time
+            self.old_time = time.time()
+            print("Delta_time: {}".format(delta_time))
+            if(0.25 < delta_time < 1.0):
+                if(len(self.color_fade_array) < self.MAX_COLORFADE_COLORS):
+                    self.color_fade_array.insert(0, new_color)
+                    print("Main::hue_changed - inserting new color into array")
+                else:
+                    self.color_fade_array.pop()
+                    self.color_fade_array.insert(0, new_color)
+                    print("Main::hue_changed - poping last value and insert")
+        else:
+            self.color_fade_array.clear()
+            self.color_fade_array.append(new_color)
+        # ------------ End new color fade -------------
 
         # Lets only change the LEDs color if the state is on
-        self.color.set_hue(value)
+        self.color.set_hue(value)  # self.color = new_color
         if self.accessory_state == 1:
             self.update_neopixel_with_color(self.color)
 
