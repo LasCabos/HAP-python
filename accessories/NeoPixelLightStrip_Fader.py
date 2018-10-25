@@ -321,7 +321,7 @@ class NeoPixelLightStrip_Fader(Accessory):
         # Color Fade Mode
         # Current Mode
         self.mode = 0x01  # Mode0x00: Single Color, Mode0x01: Color Fade
-        self.color_fade_direction = 0x00  # 0=FWD  1=REV
+        self.color_fade_direction = 0x00  # 0=FWD  1=REV ie start_color to end_color
         self.mode_timer = time.time()
         self.mode_counter = 0
         self.color_fade_ready_timer = time.time()
@@ -364,6 +364,7 @@ class NeoPixelLightStrip_Fader(Accessory):
 
         else:
             self.update_neopixel_with_color(Neo_Color.black())  # Off
+            self.color_fade_direction = 0x00 #  Reset our color fade direction for next power on
 
         self.mode_timer = time.time()
 
@@ -430,6 +431,9 @@ class NeoPixelLightStrip_Fader(Accessory):
         if(self.accessory_state == 1):
             self.update_neopixel_with_color(self.color_fade_colors.get_primary_color())
             self.color_fade_colors.set_current_pixel_color(self.color_fade_colors.get_primary_color())
+
+        # Our color has changed so we must update reset our direction
+        self.color_fade_direction = 0x00
 
     def brightness_changed(self, value):
         print("---brightness_changed---") #  TODO: - REMOVE
