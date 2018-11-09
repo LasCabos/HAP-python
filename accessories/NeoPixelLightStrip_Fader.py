@@ -212,7 +212,6 @@ class Neo_Color:
         result = False
         if(round(self._hue,2) == round(color.get_hue(),2) and round(self._saturation,2) == round(color.get_saturation(),2)):
             result = True
-        print("IsEqualWith: {}".format(result))
         return result
 
 
@@ -224,9 +223,9 @@ class ColorFadeColors():
     # TODO: - Find all functions that are not used and remove them
 
     def __init__(self, color1, color2, color3):
-        self._primaryColor = color1
-        self._secondaryColor = color2
-        self._current_pixel_color = color3
+        self._primaryColor = color1  # Start of the color fade
+        self._secondaryColor = color2  # End of the color fade
+        self._current_pixel_color = color3  # The current color between start and end
 
     def insert_new_color(self, color): # TODO: - This function can probably repalced by - GetPrimary = new_color
         self._secondaryColor = self._primaryColor
@@ -335,6 +334,7 @@ class NeoPixelLightStrip_Fader(Accessory):
             temp = 1
 
         print("Color fade direction: {}".format(temp))
+        print("NAME: {}".format(self.display_name))
 
 
     def state_changed(self, value):
@@ -345,10 +345,10 @@ class NeoPixelLightStrip_Fader(Accessory):
             if(self.wasBrightness != 1): #  Apple API Hack to stop brightness changes from changing state constantly
                 if(time.time() - self.mode_timer > 1 and time.time() - self.mode_timer < 5 ):
                     self.mode_counter += 1
-                    print("Counter: {}  deltaTime: {}".format(self.mode_counter, self.mode_timer))
-                    if(self.mode_counter == 3):
+                    #print("Counter: {}  deltaTime: {}".format(self.mode_counter, self.mode_timer))
+                    if(self.mode_counter == 2):
                         self.mode ^= 1
-                        print("Changing Mode To: {}".format(self.mode))
+                        #print("Changing Mode To: {}".format(self.mode))
                         self.mode_counter = 0
                         if(self.mode == 0x00):
                             self.flash_pixels(3, 0.5, Neo_Color.red())  # White indicates single color mode
@@ -356,7 +356,7 @@ class NeoPixelLightStrip_Fader(Accessory):
                             self.flash_pixels(3, 0.5, Neo_Color.green())  # Blue indicates color fade mode
                 else:
                     self.mode_counter = 0
-            print("state")
+            # Turn on our lights with the primary color and update the current color to the primary color
             self.update_neopixel_with_color(self.color_fade_colors.get_primary_color())
             color = self.color_fade_colors.get_primary_color()
             rgb_tuple = color.get_rgb()
@@ -375,7 +375,7 @@ class NeoPixelLightStrip_Fader(Accessory):
     @Accessory.run_at_interval(COLOR_FADE_INTERVAL)
     def run(self):
         if(self.accessory_state == 1 and self.mode == 0x01):
-            print("----- Start Loop ----")
+            #print("----- Start Loop ----")
             start_color = self.color_fade_colors.get_primary_color()
             end_color = self.color_fade_colors.get_secondary_color()
             current_color = self.color_fade_colors.get_current_pixel_color()
@@ -388,34 +388,29 @@ class NeoPixelLightStrip_Fader(Accessory):
             else:
                 delta_hue = start_color.get_hue() - end_color.get_hue()
                 delta_sat = start_color.get_saturation() - end_color.get_saturation()
-            print("Delta Hue/Sat: {} - {} ".format(delta_hue, delta_sat)) #  TODO: - REMOVE
+            #print("Delta Hue/Sat: {} - {} ".format(delta_hue, delta_sat)) #  TODO: - REMOVE
 
 
-            hue_change_value = delta_hue / TRANSITION_LENGTH * self.COLOR_FADE_INTERVAL # * modifier
-            sat_change_value = delta_sat / TRANSITION_LENGTH * self.COLOR_FADE_INTERVAL # * modifier
-            print("Change Per Interval Hue/Sat: {} - {}".format(hue_change_value, sat_change_value)) #  TODO: - REMOVE
-
-            # TODO: - Remove 
-            final_hue = current_color.get_hue() + hue_change_value
-            final_sat = current_color.get_saturation() + sat_change_value
-            print("Final Hue/Sat: {} / {}".format(final_hue, final_sat)) #  TODO: - REMOVE
+            hue_change_value = delta_hue / TRANSITION_LENGTH * self.COLOR_FADE_INTERVAL
+            sat_change_value = delta_sat / TRANSITION_LENGTH * self.COLOR_FADE_INTERVAL
+            #print("Change Per Interval Hue/Sat: {} - {}".format(hue_change_value, sat_change_value)) #  TODO: - REMOVE
 
             current_color.adj_hue(hue_change_value)
             current_color.adj_saturation(sat_change_value)
 
             #  TODO: - REMOVE
-            print("New Current Color")
-            self.color_fade_colors.print_colors("HSV")
+            #print("New Current Color")
+            #self.color_fade_colors.print_colors("HSV")
 
                         # Determine Direction of fade
             if(self.color_fade_direction == 0x00):
                 if(current_color.is_equal_with(end_color)):
-                    print("Reached the end of the transition (Pri -> Sec) - reversing") #  TODO: - REMOVE
+                    #print("Reached the end of the transition (Pri -> Sec) - reversing") #  TODO: - REMOVE
                     self.color_fade_direction ^= 1  # Flip the direction
             elif(self.color_fade_direction == 0x01):
                 if(current_color.is_equal_with(start_color)):
                     self.color_fade_direction ^= 1
-                    print("Reached the end of the transition (Sec -> Pri) - reversing") #  TODO: - REMOVE
+                    #print("Reached the end of the transition (Sec -> Pri) - reversing") #  TODO: - REMOVE
 
             self.update_neopixel_with_color(current_color)
 
