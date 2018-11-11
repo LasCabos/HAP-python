@@ -14,6 +14,12 @@ An Accessory for Adafruit NeoPixels attached to GPIO Pin18
            sudo python3.6 setup.py install
  https://learn.adafruit.com/neopixels-on-raspberry-pi/software
 
+ USing GPIO Memory requires python to be run as root (sudo). This can be fixed by using command on rpi
+ 1. sudo chown -v root:root /usr/bin/python3
+ 2. sudo chown -v u+s /usr/bin/python3
+ This will cause pip to act a bit funny when you want to install anything later on so just reverse the above changes
+ from step 2 as needed. Just use the same commands but with pi instead of root and with u-s.
+
  Apple Homekit API Call Order
  User changes light settings on iOS device
  Changing Brightness - Brightness - State
