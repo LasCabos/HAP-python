@@ -32,8 +32,7 @@ def get_bridge(driver):
 
 def get_accessory(driver):
     """Call this method to get a standalone Accessory."""
-    return NeoPixelLightStrip_Fader(64,True,18,800000,10,255,False, driver, 'NeoPixel')
-
+    return NeoPixelLightStrip_Fader(False, 144, True, 18, 800000, 10, 255, False, driver, 'NeoPixel')
 
 # Start the accessory on port 51826
 driver = AccessoryDriver(port=8476)

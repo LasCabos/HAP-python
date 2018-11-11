@@ -5,7 +5,7 @@ An Accessory for Adafruit NeoPixels attached to GPIO Pin18
  Note: RPi GPIO must be PWM. Neopixels.py will warn if wrong GPIO is used
        at runtime
  Note: This Class requires the installation of rpi_ws281x lib
-       Follow the instllation instructions;
+       Follow the installation instructions;
            git clone https://github.com/jgarff/rpi_ws281x.git
            cd rpi_ws281x
            scons
@@ -30,7 +30,7 @@ An Accessory for Adafruit NeoPixels attached to GPIO Pin18
 
  Apple Homekit API Values 
  Hue: 0 -360
- Saturuation: 0 - 100
+ Saturation: 0 - 100
  Brightness: 0 - 100
  State: 0 - 1
 """
@@ -44,7 +44,7 @@ from pyhap.accessory import Accessory
 from pyhap.const import CATEGORY_LIGHTBULB
 
 
-class Neo_Color:
+class NeoPixelColor:
     """Class is used for easy passing and converting of colors between
     Apple HomeKit API and NeoPixel Library
     Conversion from HSV to RGB use python colorsys library whos values 
@@ -88,7 +88,6 @@ class Neo_Color:
         red = WRGB_24Bit >> 16 & 0xFF
         green = WRGB_24Bit >> 8 & 0xFF
         blue = WRGB_24Bit & 0xFF
-        print("from_24Bit_RGB: {}, {}, {}".format(red, green, blue))
         color.set_color_with_rgb(red, green, blue)
         return color
 
@@ -122,6 +121,7 @@ class Neo_Color:
         color = cls()
         color.set_color_with_rgb(255, 0, 0)
         return color
+
     # End predefined colors
 
     @classmethod  # INFO: - Testing only remove for merge
@@ -216,15 +216,16 @@ class Neo_Color:
 
     def is_equal_with(self, color):
         result = False
-        if(round(self._hue,2) == round(color.get_hue(),2) and round(self._saturation,2) == round(color.get_saturation(),2)):
+        if (round(self._hue, 2) == round(color.get_hue(), 2) and round(self._saturation, 2) == round(
+                color.get_saturation(), 2)):
             result = True
         return result
 
 
-class ColorFadeColors():
+class ColorFadeColors:
     """ This class stores the color fade colors and allows
     convenience for adding and removing
-    Max Storrage = 2 """
+    Max Storage = 2 """
 
     # TODO: - Find all functions that are not used and remove them
 
@@ -233,7 +234,7 @@ class ColorFadeColors():
         self._secondaryColor = color2  # End of the color fade
         self._current_pixel_color = color3  # The current color between start and end
 
-    def insert_new_color(self, color): # TODO: - This function can probably repalced by - GetPrimary = new_color
+    def insert_new_color(self, color):  # TODO: - This function can probably repalced by - GetPrimary = new_color
         self._secondaryColor = self._primaryColor
         self._primaryColor = color
 
@@ -262,11 +263,11 @@ class ColorFadeColors():
         return self._current_pixel_color
 
     def print_colors(self, type):
-        if(type == "RGB"):
+        if type == "RGB":
             print("RGB - Pri: {}   Sec: {}   LRPC: {}".format(self._primaryColor.get_rgb(),
                                                               self._secondaryColor.get_rgb(),
                                                               self._current_pixel_color.get_rgb()))
-        elif(type == "HSV" or type == "HSB"):
+        elif type == "HSV" or type == "HSB":
             print("HSV - Pri: {}   Sec: {}   LRPC: {}".format(self._primaryColor.get_hsv(),
                                                               self._secondaryColor.get_hsv(),
                                                               self._current_pixel_color.get_hsv()))
@@ -274,20 +275,20 @@ class ColorFadeColors():
             print("Unknown color format - Cannot print requested colors. See ColorFadeColors.print_colors")
 
     def print_hex_memory_ids(self):
-        print("HEX IDS: {}, {}, {}".format(hex(id(self._primaryColor)), hex(id(self._secondaryColor)), hex(id(self._current_pixel_color))))
-
+        print("HEX IDS: {}, {}, {}".format(hex(id(self._primaryColor)), hex(id(self._secondaryColor)),
+                                           hex(id(self._current_pixel_color))))
 
 
 class NeoPixelLightStrip_Fader(Accessory):
-
     category = CATEGORY_LIGHTBULB
     COLOR_FADE_INTERVAL = 1
 
-    def __init__(self, LED_count, is_GRB, LED_pin,
+    def __init__(self, startup_in_color_fade_mode: bool, LED_count, is_GRB: bool, LED_pin,
                  LED_freq_hz, LED_DMA, LED_brightness,
-                 LED_invert, *args, **kwargs):
+                 LED_invert: bool, *args, **kwargs):
 
         """
+        startup_in_color_fade_mode - this will run color fade mode at startup
         LED_Count - the number of LEDs in the array
         is_GRB - most neopixels are GRB format - Normal:True
         LED_pin - must be PWM pin 18 - Normal:18
@@ -325,111 +326,104 @@ class NeoPixelLightStrip_Fader(Accessory):
 
         # Color Fade Mode
         # Current Mode
-        self.mode = 0x01  # Mode0x00: Single Color, Mode0x01: Color Fade
+        if startup_in_color_fade_mode:
+            self.mode = 0x01  # Mode0x00: Single Color, Mode0x01: Color Fade
+        else:
+            self.mode = 0x00
         self.color_fade_direction = 0x00  # 0=FWD  1=REV ie start_color to end_color
         self.mode_timer = time.time()
         self.mode_counter = 0
         self.color_fade_ready_timer = time.time()
-        self.color_fade_colors = ColorFadeColors(Neo_Color.red(), Neo_Color.blue(), Neo_Color.red())
+        self.color_fade_colors = ColorFadeColors(NeoPixelColor.red(), NeoPixelColor.blue(), NeoPixelColor.red())
         self.color_fade_colors.print_hex_memory_ids()
-        self.color_fade_colors.print_colors("RGB")
         self.old_time = time.time()
+        self.wasBrightness = 0
 
         temp = 0
-        if(self.color_fade_direction == 0x01):
+        if self.color_fade_direction == 0x01:
             temp = 1
 
         print("Color fade direction: {}".format(temp))
         print("NAME: {}".format(self.display_name))
-
 
     def state_changed(self, value):
         print("state_changed")
         self.accessory_state = value
 
         if value == 1:  # On
-            if(self.wasBrightness != 1): #  Apple API Hack to stop brightness changes from changing state constantly
-                if(time.time() - self.mode_timer > 1 and time.time() - self.mode_timer < 5 ):
+            if self.wasBrightness != 1:  # Apple API Hack to stop brightness changes from changing state constantly
+                if 1 < time.time() - self.mode_timer < 5:
                     self.mode_counter += 1
-                    #print("Counter: {}  deltaTime: {}".format(self.mode_counter, self.mode_timer))
-                    if(self.mode_counter == 2):
+                    # print("Counter: {}  deltaTime: {}".format(self.mode_counter, self.mode_timer))
+                    if self.mode_counter == 2:
                         self.mode ^= 1
-                        #print("Changing Mode To: {}".format(self.mode))
+                        # print("Changing Mode To: {}".format(self.mode))
                         self.mode_counter = 0
-                        if(self.mode == 0x00):
-                            self.flash_pixels(3, 0.5, Neo_Color.red())  # White indicates single color mode
+                        if self.mode == 0x00:
+                            self.flash_pixels(3, 0.5, NeoPixelColor.red())  # White indicates single color mode
                         else:
-                            self.flash_pixels(3, 0.5, Neo_Color.green())  # Blue indicates color fade mode
+                            self.flash_pixels(3, 0.5, NeoPixelColor.green())  # Blue indicates color fade mode
                 else:
                     self.mode_counter = 0
             # Turn on our lights with the primary color and update the current color to the primary color
             self.update_neopixel_with_color(self.color_fade_colors.get_primary_color())
             color = self.color_fade_colors.get_primary_color()
             rgb_tuple = color.get_rgb()
-            self.color_fade_colors.get_current_pixel_color().set_color_with_rgb(rgb_tuple[0], rgb_tuple[1], rgb_tuple[2])
+            self.color_fade_colors.get_current_pixel_color().set_color_with_rgb(rgb_tuple[0], rgb_tuple[1],
+                                                                                rgb_tuple[2])
 
         else:
-            self.update_neopixel_with_color(Neo_Color.black())  # Off
-            self.color_fade_direction = 0x00 #  Reset our color fade direction for next power on
+            self.update_neopixel_with_color(NeoPixelColor.black())  # Off
+            self.color_fade_direction = 0x00  # Reset our color fade direction for next power on
 
         self.mode_timer = time.time()
 
         self.wasBrightness = 0  # Reset our hack to 0
 
-
-# Lets check if we should update our color
+    # Lets check if we should update our color
     @Accessory.run_at_interval(COLOR_FADE_INTERVAL)
     def run(self):
-        if(self.accessory_state == 1 and self.mode == 0x01):
-            #print("----- Start Loop ----")
+        if self.accessory_state == 1 and self.mode == 0x01:
+            # print("----- Start Loop ----")
             start_color = self.color_fade_colors.get_primary_color()
             end_color = self.color_fade_colors.get_secondary_color()
             current_color = self.color_fade_colors.get_current_pixel_color()
 
             # Fade Calculation
             TRANSITION_LENGTH = 60 * 10  # seconds
-            if(self.color_fade_direction == 0x00):
+            if self.color_fade_direction == 0x00:
                 delta_hue = end_color.get_hue() - start_color.get_hue()
                 delta_sat = end_color.get_saturation() - start_color.get_saturation()
             else:
                 delta_hue = start_color.get_hue() - end_color.get_hue()
                 delta_sat = start_color.get_saturation() - end_color.get_saturation()
-            #print("Delta Hue/Sat: {} - {} ".format(delta_hue, delta_sat)) #  TODO: - REMOVE
-
 
             hue_change_value = delta_hue / TRANSITION_LENGTH * self.COLOR_FADE_INTERVAL
             sat_change_value = delta_sat / TRANSITION_LENGTH * self.COLOR_FADE_INTERVAL
-            #print("Change Per Interval Hue/Sat: {} - {}".format(hue_change_value, sat_change_value)) #  TODO: - REMOVE
 
             current_color.adj_hue(hue_change_value)
             current_color.adj_saturation(sat_change_value)
 
-            #  TODO: - REMOVE
-            #print("New Current Color")
-            #self.color_fade_colors.print_colors("HSV")
-
-                        # Determine Direction of fade
-            if(self.color_fade_direction == 0x00):
-                if(current_color.is_equal_with(end_color)):
-                    #print("Reached the end of the transition (Pri -> Sec) - reversing") #  TODO: - REMOVE
+            # Determine Direction of fade
+            if self.color_fade_direction == 0x00:
+                if current_color.is_equal_with(end_color):
                     self.color_fade_direction ^= 1  # Flip the direction
-            elif(self.color_fade_direction == 0x01):
-                if(current_color.is_equal_with(start_color)):
+            elif self.color_fade_direction == 0x01:
+                if current_color.is_equal_with(start_color):
                     self.color_fade_direction ^= 1
-                    #print("Reached the end of the transition (Sec -> Pri) - reversing") #  TODO: - REMOVE
 
             self.update_neopixel_with_color(current_color)
 
-
     def hue_changed(self, value):
-        print("Hue_change") #  TODO: - REMOVE
+        print("Hue_change")  # TODO: - REMOVE
         old_color = self.color_fade_colors.get_primary_color()
-        new_color = Neo_Color.from_color(old_color)
+        new_color = NeoPixelColor.from_color(old_color)
 
         new_color.set_hue(value)
-        self.color_fade_colors.insert_new_color(new_color) #  This function moves the old primary to secondary and replaces primary with new
+        self.color_fade_colors.insert_new_color(
+            new_color)  # This function moves the old primary to secondary and replaces primary with new
 
-        if(self.accessory_state == 1):
+        if self.accessory_state == 1:
             self.update_neopixel_with_color(self.color_fade_colors.get_primary_color())
             self.color_fade_colors.set_current_pixel_color(self.color_fade_colors.get_primary_color())
 
@@ -437,7 +431,7 @@ class NeoPixelLightStrip_Fader(Accessory):
         self.color_fade_direction = 0x00
 
     def brightness_changed(self, value):
-        print("---brightness_changed---") #  TODO: - REMOVE
+        print("---brightness_changed---")  # TODO: - REMOVE
         self.wasBrightness = 1  # Hack for Appkit API brightness changing state
         pri = self.color_fade_colors.get_primary_color()
         sec = self.color_fade_colors.get_secondary_color()
@@ -445,13 +439,13 @@ class NeoPixelLightStrip_Fader(Accessory):
         pri.set_brightness(value)
         sec.set_brightness(value)
 
-        if(self.accessory_state == 1):
+        if self.accessory_state == 1:
             self.update_neopixel_with_color(pri)
             self.color_fade_colors.set_current_pixel_color(pri)
 
     def saturation_changed(self, value):
-        print("---saturation_changed---") #  TODO: - REMOVE
-        """ Saturation is never called on its own and always follwed by hue
+        print("---saturation_changed---")  # TODO: - REMOVE
+        """ Saturation is never called on its own and always followed by hue
             Because of this we will update the primary
             saturation value only and let the hue call handel the final
             insertion and application of the new colors"""
@@ -462,7 +456,7 @@ class NeoPixelLightStrip_Fader(Accessory):
     def update_neopixel_with_color(self, color):
         rgb_tuple = color.get_rgb()
         for i in range(self.LED_count):
-            if(self.is_GRB):
+            if self.is_GRB:
                 self.neo_strip.setPixelColor(i, Color(int(rgb_tuple[1]),
                                                       int(rgb_tuple[0]),
                                                       int(rgb_tuple[2])))
@@ -472,11 +466,10 @@ class NeoPixelLightStrip_Fader(Accessory):
                                                       int(rgb_tuple[2])))
         self.neo_strip.show()
 
-
     def flash_pixels(self, number_of_flashes, delay_between_flashes_seconds, flash_color):
         # Note: - Flashing does not work yet because I dont know how to thread
         for x in range(number_of_flashes):
-            self.update_neopixel_with_color(Neo_Color.black())
+            self.update_neopixel_with_color(NeoPixelColor.black())
             time.sleep(delay_between_flashes_seconds)
             self.update_neopixel_with_color(flash_color)
             time.sleep(delay_between_flashes_seconds)
